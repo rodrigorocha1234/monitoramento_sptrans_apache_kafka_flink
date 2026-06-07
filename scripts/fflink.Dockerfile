@@ -1,37 +1,37 @@
-FROM flink:2.2.0
+FROM flink:2.2.0-scala_2.12
 
 USER root
 
-# Instala Python e dependências de compilação
-RUN apt-get update -y && \
-    apt-get install -y --no-install-recommends \
-        python3 \
-        python3-pip \
-        python3-dev \
-        python3-venv \
-        build-essential \
-        gcc \
-        g++ \
-        libffi-dev \
-        libssl-dev && \
-    rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /opt/flink/lib
 
-# Cria link simbólico para "python"
-RUN ln -sf /usr/bin/python3 /usr/bin/python
+# Kafka
+RUN wget -P /opt/flink/lib \
+    https://repo1.maven.org/maven2/org/apache/flink/flink-connector-kafka/4.0.1-2.0/flink-connector-kafka-4.0.1-2.0.jar
 
-# Cria ambiente virtual para evitar erro PEP 668 (externally-managed-environment)
-RUN python3 -m venv /opt/venv
+# Flink Avro
+RUN wget -P /opt/flink/lib \
+    https://repo1.maven.org/maven2/org/apache/flink/flink-avro/2.2.0/flink-avro-2.2.0.jar
 
-# Adiciona o venv ao PATH
-ENV PATH="/opt/venv/bin:${PATH}"
+# Apache Avro
+RUN wget -P /opt/flink/lib \
+    https://repo1.maven.org/maven2/org/apache/avro/avro/1.12.0/avro-1.12.0.jar
 
-# Atualiza ferramentas do pip dentro do ambiente virtual
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+# Confluent Registry
+RUN wget -P /opt/flink/lib \
+    https://repo1.maven.org/maven2/org/apache/flink/flink-avro-confluent-registry/2.2.0/flink-avro-confluent-registry-2.2.0.jar
 
-# Instala PyFlink
-RUN pip install --no-cache-dir apache-flink==2.2.0
+# Jackson
+RUN wget -P /opt/flink/lib \
+ https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-core/2.18.4/jackson-core-2.18.4.jar
 
-RUN wget -O /opt/flink/lib/flink-sql-connector-kafka-4.0.1-2.0.jar \
-    https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-kafka/4.0.1-2.0/flink-sql-connector-kafka-4.0.1-2.0.jar
+RUN wget -P /opt/flink/lib \
+ https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.18.4/jackson-annotations-2.18.4.jar
+
+RUN wget -P /opt/flink/lib \
+ https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.18.4/jackson-databind-2.18.4.jar
+
+# Kafka clients (FALTAVA ISSO)
+RUN wget -P /opt/flink/lib \
+https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.7.0/kafka-clients-3.7.0.jar
 
 USER flink

@@ -6,105 +6,66 @@ networks:
         - subnet: 172.20.0.0/16
 
 services:
-  flink-jobmanager:
+
+  jobmanager:
     build:
-      context: ./scripts
-      dockerfile: fflink.Dockerfile
+      context: .
+      dockerfile: scripts/fflink.Dockerfile
     container_name: flink-jobmanager
     hostname: jobmanager
     command: jobmanager
     profiles:
-      - servico_extracao_sptans
+      - servico_flink
     ports:
-      - "8081:8081"   # Flink Web UI
-      - "8083:8083"
+      - "8081:8081"
     networks:
       flink-net:
         ipv4_address: 172.20.0.10
-
     environment:
-      TZ: America/Sao_Paulo
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
-        parallelism.default: 2
-        
-        # Habilita o SQL Gateway
         rest.address: jobmanager
-        sql-gateway.endpoint.type: rest
-        sql-gateway.bind-address: 0.0.0.0
-        sql-gateway.bind-port: 8083
-    volumes:
-      - ./flink/jobs:/opt/flink/jobs
 
-  flink-taskmanager-1:
+  taskmanager:
     build:
-      context: ./scripts
-      dockerfile: fflink.Dockerfile
-    container_name: flink-taskmanager-1
-    depends_on:
-      - flink-jobmanager
+      context: .
+      dockerfile: scripts/fflink.Dockerfile
+    container_name: flink-taskmanager
+    hostname: taskmanager
     command: taskmanager
+    depends_on:
+      - jobmanager
     profiles:
-      - servico_extracao_sptans
+      - servico_flink
     networks:
       flink-net:
         ipv4_address: 172.20.0.11
     environment:
-      TZ: America/Sao_Paulo
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
-        taskmanager.numberOfTaskSlots: 4
-    volumes:
-      - ./flink/jobs:/opt/flink/jobs
+        taskmanager.numberOfTaskSlots: 2
 
-
-  flink-taskmanager-2:
+  sql-client:
     build:
-      context: ./scripts
-      dockerfile: fflink.Dockerfile
-    container_name: flink-taskmanager-2
-    depends_on:
-      - flink-jobmanager
-    command: taskmanager
-    profiles:
-      - servico_extracao_sptans
-    networks:
-      flink-net:
-        ipv4_address: 172.20.0.12
-    environment:
-      TZ: America/Sao_Paulo
-      FLINK_PROPERTIES: |
-        jobmanager.rpc.address: jobmanager
-        taskmanager.numberOfTaskSlots: 4
-    volumes:
-      - ./flink/jobs:/opt/flink/jobs
-
-
-  flink-sql-client:
-    build:
-      context: ./scripts
-      dockerfile: fflink.Dockerfile
+      context: .
+      dockerfile: scripts/fflink.Dockerfile
     container_name: flink-sql-client
+    hostname: sql-client
     profiles:
-      - servico_extracao_sptans
+      - servico_flink
     depends_on:
-      - flink-jobmanager
-    command: tail -f /dev/null
+      - jobmanager
+      - taskmanager
+    command: bin/sql-client.sh
     stdin_open: true
     tty: true
     networks:
       flink-net:
-        ipv4_address: 172.20.0.20
+        ipv4_address: 172.20.0.12
     environment:
-      TZ: America/Sao_Paulo
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
-        rest.address: jobmanager    
-    volumes:
-      - ./flink/sql:/opt/flink/sql
-      - ./flink/sql:/opt/flink/sql
-
-
+        rest.address: jobmanager
 
   kafka:
     image: apache/kafka:4.1.1
@@ -116,9 +77,9 @@ services:
       flink-net:
         ipv4_address: 172.20.0.21
     ports:
-      - "9092:9092"   # acesso externo (host)
-      - "9093:9093"   # controller
-      - "29092:29092" # acesso interno (containers)
+      - "9092:9092"
+      - "9093:9093"
+      - "29092:29092"
     environment:
       KAFKA_PROCESS_ROLES: "broker,controller"
       KAFKA_NODE_ID: "1"
@@ -136,28 +97,30 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+
       KAFKA_LOG_DIRS: "/var/lib/kafka/data"
+
     volumes:
       - ./kafka_data:/var/lib/kafka/data
+
     restart: unless-stopped
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
+    hostname: kafka-ui
     profiles:
       - servico_kafka
-    hostname: kafka-ui
     depends_on:
       - kafka
     ports:
-      - "8084:8080"   # UI acessível no navegador
-    environment:
-      KAFKA_CLUSTERS_0_NAME: "local-cluster"
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:29092"
-      KAFKA_CLUSTERS_0_ZOOKEEPER: ""  # vazio, pois estamos em KRaft
+      - "8084:8080"
     networks:
       flink-net:
         ipv4_address: 172.20.0.22
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
     restart: unless-stopped
 
   schema-registry:
@@ -166,22 +129,15 @@ services:
     hostname: schema-registry
     profiles:
       - servico_kafka
-
     depends_on:
       - kafka
-
     networks:
       flink-net:
         ipv4_address: 172.20.0.23
-
     ports:
       - "8085:8081"
-
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
-
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
-
     restart: unless-stopped

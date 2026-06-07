@@ -2,8 +2,7 @@
 DROP TABLE IF EXISTS linhas_onibus;
 
 -- Tabela corrigida incluindo a coluna física da chave Kafka
-CREATE TABLE linhas_onibus (
-    kafka_key STRING,
+CREATE TABLE bus_positions_raw (
 
     c STRING,
     cl INT,
@@ -11,29 +10,36 @@ CREATE TABLE linhas_onibus (
     lt0 STRING,
     lt1 STRING,
     qv INT,
-    p INT,
     a BOOLEAN,
 
-    ta BIGINT,
+    ta INT,
+    ta_tempo STRING,
+
     py DOUBLE,
     px DOUBLE,
 
-    ta_ts AS TO_TIMESTAMP_LTZ(ta, 3),
+    event_time AS TO_TIMESTAMP(ta_tempo),
 
-    WATERMARK FOR ta_ts AS ta_ts - INTERVAL '60' SECOND
-) WITH (
+    WATERMARK FOR event_time AS
+        event_time - INTERVAL '10' SECOND
+
+)
+WITH (
+
     'connector' = 'kafka',
-    'topic' = 'linhas_onibus',
+
+    'topic' = 'posicoes_sptrans',
+
     'properties.bootstrap.servers' = 'kafka:29092',
-    'properties.group.id' = 'flink-sptrans-consumer',
-    'scan.startup.mode' = 'earliest-offset',
 
-    'key.format' = 'raw',
-    'key.fields' = 'kafka_key',
+    'properties.group.id' = 'flink-bus-monitor',
 
-    'value.format' = 'json',
-    'value.fields-include' = 'EXCEPT_KEY',
-    'value.json.ignore-parse-errors' = 'true'
+    'scan.startup.mode' = 'latest-offset',
+
+    'format' = 'avro-confluent',
+
+    'avro-confluent.url' = 'http://schema-registry:8081'
+
 );
 
 -- Teste
