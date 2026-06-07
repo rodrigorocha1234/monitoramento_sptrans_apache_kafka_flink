@@ -74,6 +74,7 @@ class ApiSptrans:
 if __name__ == "__main__":
     api_sptrans = ApiSptrans()
     linhas = api_sptrans.buscar_linhas()
-    for linha in linhas:
-        print(linha)
-        print()
+    if linhas:
+        for linha in linhas:
+            print(linha)
+            print()

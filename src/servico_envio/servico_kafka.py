@@ -1,11 +1,12 @@
+import logging
 from typing import Final
 
 from confluent_kafka import Producer
 from confluent_kafka.serialization import StringSerializer, SerializationContext, MessageField
 
-from config.config import Config
-from estrategia_serializacao.estrategia_serializacao import EstrategiaSerializacao
-import logging
+from src.config.config import Config
+from src.estrategia_serializacao.estrategia_serializacao import EstrategiaSerializacao
+from src.modelo.linha import Linha
 
 logging.basicConfig(level=logging.INFO, format=("%(asctime)s - "
                                                 "%(name)s - "
@@ -13,6 +14,7 @@ logging.basicConfig(level=logging.INFO, format=("%(asctime)s - "
                                                 "%(message)s"))
 
 logger = logging.getLogger("kafka.avro.producer")
+
 
 class ProdutorKafka:
     def __init__(self, estrategia_serializacao: EstrategiaSerializacao):
@@ -31,12 +33,9 @@ class ProdutorKafka:
 
         logger.info("Mensagem enviada. tópico=%s partição=%s offset=%s", msg.topic(), msg.partition(), msg.offset())
 
-    def enviar_dados(self, dados: dict):
-        self.__producer.produce(
-            topic=self.__TOPICO,
-            key=self.__string_sertializer("100"),
-            value=self.__estrategia_serializacao.serializacao(
-                user, SerializationContext(self.__TOPICO, MessageField.VALUE)),
-            on_delivery=self.__obter_retorno
-
-        )
+    def enviar_dados(self, dados_envio: Linha):
+        self.__producer.produce(topic=self.__TOPICO, key=self.__string_sertializer(str(dados_envio.get("cl"))),
+            value=self.__estrategia_serializacao.serializacao(dados_envio,
+                                                              SerializationContext(self.__TOPICO, MessageField.VALUE)),
+            on_delivery=self.__obter_retorno)
+        self.__producer.flush()

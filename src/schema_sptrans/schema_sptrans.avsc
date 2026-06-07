@@ -1,0 +1,51 @@
+{
+  "namespace": "sptrans",
+  "type": "record",
+  "name": "BusPosition",
+  "fields": [
+    {
+      "name": "c",
+      "type": "string"
+    },
+    {
+      "name": "cl",
+      "type": "int"
+    },
+    {
+      "name": "sl",
+      "type": "int"
+    },
+    {
+      "name": "lt0",
+      "type": "string"
+    },
+    {
+      "name": "lt1",
+      "type": "string"
+    },
+    {
+      "name": "qv",
+      "type": "int"
+    },
+    {
+      "name": "a",
+      "type": "boolean"
+    },
+    {
+      "name": "ta",
+      "type": "int"
+    },
+    {
+      "name": "ta_tempo",
+      "type": "string"
+    },
+    {
+      "name": "py",
+      "type": "double"
+    },
+    {
+      "name": "px",
+      "type": "double"
+    }
+  ]
+}
