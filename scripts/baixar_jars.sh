@@ -1,0 +1,6 @@
+mkdir -p ./jars
+
+FLINK_VERSION=2.2.0
+
+wget -P ./jars \
+https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-kafka/4.0.1-2.0/flink-sql-connector-kafka-4.0.1-2.0.jar

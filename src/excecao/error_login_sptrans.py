@@ -1,0 +1,3 @@
+
+class ErroLoginSPTrans(Exception):
+    pass
