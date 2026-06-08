@@ -22,8 +22,8 @@ class BasePipeline:
 
 
     def rodar_pipeline(self):
-        linhas = self.__recuperar_dados_onibus()
         while True:
+            linhas = self.__recuperar_dados_onibus()
             if linhas:
                 for linha in linhas:
                     self.__servico_streaming.enviar_dados(linha)

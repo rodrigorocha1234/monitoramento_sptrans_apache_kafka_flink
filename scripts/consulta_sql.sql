@@ -114,32 +114,35 @@ SELECT
         WHEN prev_ta IS NULL THEN NULL
         WHEN TIMESTAMPDIFF(SECOND, prev_ta, ta_ts) <= 0 THEN NULL
         ELSE
-            (
-                6371.0 * 2 * ASIN(
-                    SQRT(
-                        POWER(
-                            SIN(RADIANS(latitude - prev_latitude) / 2),
-                            2
-                        )
-                        +
-                        COS(RADIANS(prev_latitude))
-                        *
-                        COS(RADIANS(latitude))
-                        *
-                        POWER(
-                            SIN(RADIANS(longitude - prev_longitude) / 2),
-                            2
+            ROUND(
+                (
+                    6371.0 * 2 * ASIN(
+                        SQRT(
+                            POWER(
+                                SIN(RADIANS(latitude - prev_latitude) / 2),
+                                2
+                            )
+                            +
+                            COS(RADIANS(prev_latitude))
+                            *
+                            COS(RADIANS(latitude))
+                            *
+                            POWER(
+                                SIN(RADIANS(longitude - prev_longitude) / 2),
+                                2
+                            )
                         )
                     )
                 )
-            )
-            /
-            (
-                TIMESTAMPDIFF(
-                    SECOND,
-                    prev_ta,
-                    ta_ts
-                ) / 3600.0
+                /
+                (
+                    TIMESTAMPDIFF(
+                        SECOND,
+                        prev_ta,
+                        ta_ts
+                    ) / 3600.0
+                ), 
+                2
             )
     END AS velocidade_kmh
 

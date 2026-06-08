@@ -1,0 +1,27 @@
+Explicação do Arquivo consulta_sql.sql
+======================================
+
+O arquivo `consulta_sql.sql` é um script de processamento de stream escrito para ser executado no motor Apache Flink SQL. Seu objetivo principal é consumir, em tempo real, um fluxo contínuo de dados contendo as posições geográficas dos ônibus da SPTrans (enviados a partir de um tópico do Apache Kafka) e processar esses dados para calcular a velocidade instantânea (km/h) de cada veículo.
+
+O processamento do script é dividido logicamente em três etapas principais:
+
+1. Definição da Tabela (Fonte de Dados Kafka)
+-----------------------------------------------------------
+A tabela `linhas_onibus` é definida para espelhar e ingerir as mensagens do Kafka.
+- Mapeamento de Colunas: Reflete exatamente os campos do schema Avro recebidos da API (ex: `p` como id do ônibus, `c` como a linha, `py` como latitude, `px` como longitude).
+- Tempo de Evento (Event Time) e Watermark: A coluna `ta_ts` é criada convertendo a string `ta_tempo` para o tipo TIMESTAMP. A declaração de `WATERMARK` informa ao Flink como gerenciar atrasos na rede (permitindo lidar com eventos que chegam com até 10 segundos de latência). Isso é mandatório para permitir funções analíticas temporais em um ambiente de streaming.
+- Propriedades de Conexão: A cláusula `WITH` configura parâmetros do Kafka (servidores, nome do tópico e de grupo), modo de leitura (`latest-offset`) e configurações do Avro vinculadas ao Schema Registry.
+
+2. View Temporária (`velocidades_onibus`)
+--------------------------------------------------
+Esta etapa enriquece os eventos individuais atuais anexando metadados do evento imediatamente anterior para o mesmo ônibus.
+- Uso de `LAG()`: Essa é uma função analítica de janelamento que consegue retroceder os dados.
+- Particionamento: O uso de `OVER (PARTITION BY p ORDER BY ta_ts)` divide os fluxos separando o histórico por veículo (`p`), ordenado pelo horário de geração do evento.
+- Graças a isso, a view produz em uma única linha tabular a posição atual (`latitude`, `longitude`, `ta_ts`) emparelhada à posição anterior (`prev_latitude`, `prev_longitude`, `prev_ta`), tornando possível um cálculo de variação.
+
+3. Cálculo Analítico (Distância e Velocidade)
+-----------------------------------------------------
+O `SELECT` final pega os registros pareados (atual e prévio) da view anterior e executa as fórmulas matemáticas:
+- Cálculo de Distância: Implementa nativamente em SQL a famosa "Fórmula de Haversine" (utilizando `ASIN`, `SQRT`, `POWER`, `SIN`, `COS`, `RADIANS`). A fórmula permite calcular a distância em curva na superfície da Terra utilizando a variação entre a Latitude/Longitude antiga e a atual, multiplicada pelo diâmetro da terra (~6371 * 2 km).
+- Delta de Tempo: Acha a diferença transcorrida com `TIMESTAMPDIFF`, informando quantos segundos se passaram entre o registro anterior e o atual.
+- Proteção e Velocidade: Antes de calcular os km/h finais, um bloco `CASE WHEN` garante que não ocorra cálculos absurdos ou "Divisão por Zero", cancelando o processamento caso o tempo medido seja <= 0. Se tudo estiver regular, divide a distância em Km pelas frações de hora equivalentes (segundos / 3600.0).

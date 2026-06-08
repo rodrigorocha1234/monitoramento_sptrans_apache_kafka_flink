@@ -1,0 +1,65 @@
+Dicionário e Explicação Detalhada: consulta_sql.sql
+==================================================
+
+Este documento explica de forma detalhada cada consulta (query) e cada campo contido no arquivo `consulta_sql.sql`.
+
+--------------------------------------------------------------------------------
+1. CRIAÇÃO DA TABELA (FONTE DE DADOS KAFKA)
+--------------------------------------------------------------------------------
+Comando: CREATE TABLE linhas_onibus (...) WITH (...)
+Objetivo: Conectar o Flink SQL com o barramento do Kafka, definindo as colunas com base nos dados brutos JSON/Avro oriundos da SPTrans.
+
+Campos da Tabela:
+* c (STRING): Representa o letreiro completo da linha (ex: "8000-10").
+* cl (INT): Código identificador único da linha dentro do sistema da SPTrans.
+* sl (INT): Sentido de operação da linha (ex: 1 para Principal/Ida, 2 para Secundário/Volta).
+* lt0 (STRING): Letreiro de destino principal (letreiro letreiro no sentido de ida).
+* lt1 (STRING): Letreiro de destino secundário (letreiro letreiro no sentido de volta).
+* qv (INT): Quantidade total de veículos rodando nesta linha no momento.
+* p (INT): Prefixo do ônibus. É o identificador único do veículo específico que enviou a localização.
+* a (BOOLEAN): Flag de acessibilidade. Retorna True se o veículo é adaptado para pessoas com deficiência.
+* ta (BIGINT): Timestamp bruto em milissegundos representando exatamente quando a localização foi capturada.
+* ta_tempo (STRING): A data e hora legível (em formato de texto) gerada a partir do 'ta', como 'YYYY-MM-DD HH:MM:SS'.
+* py (DOUBLE): Eixo Y espacial, ou seja, a Latitude da posição GPS atual do ônibus.
+* px (DOUBLE): Eixo X espacial, ou seja, a Longitude da posição GPS atual do ônibus.
+* ta_ts AS TO_TIMESTAMP(ta_tempo): Uma coluna virtual gerada pelo Flink. Converte a String `ta_tempo` para um tipo primitivo de Tempo (TIMESTAMP) interno para o processamento de stream fluir corretamente.
+* WATERMARK FOR ta_ts AS ta_ts - INTERVAL '10' SECOND: O mecanismo de "relógio" da stream. O Flink considerará eventos atrasados em até 10 segundos como válidos antes de avançar as janelas operacionais de tempo.
+
+--------------------------------------------------------------------------------
+2. CONSULTA DE TESTE
+--------------------------------------------------------------------------------
+Comando: SELECT * FROM linhas_onibus;
+Objetivo: Uma consulta trivial usada tipicamente no SQL Client ou em logs para debugar se as conexões, deserializações do Avro e partições do Kafka estão fluindo adequadamente. Se essa query trouxer dados, a infraestrutura da stream está perfeitamente funcional.
+
+--------------------------------------------------------------------------------
+3. CRIAÇÃO DA VIEW TEMPORÁRIA
+--------------------------------------------------------------------------------
+Comando: CREATE TEMPORARY VIEW velocidades_onibus AS ...
+Objetivo: Transformar os dados para que cada linha atual também possua o registro histórico exato da leitura GPS anterior daquele mesmo ônibus (usando a função LAG).
+
+Campos Mapeados na View:
+* bus_id: Aliasing (novo nome) para a coluna `p` (prefixo do ônibus).
+* linha: Aliasing para a coluna `c` (letreiro completo da linha).
+* ta_ts: Timestamp do momento que o evento ocorreu.
+* latitude: Aliasing da coluna `py`.
+* longitude: Aliasing da coluna `px`.
+* prev_latitude: Gerado pelo `LAG(py)`. É a latitude onde aquele mesmo ônibus estava no último "ping" recebido.
+* prev_longitude: Gerado pelo `LAG(px)`. É a longitude de onde aquele ônibus estava no último ping.
+* prev_ta: Gerado pelo `LAG(ta_ts)`. É o momento exato de tempo do último ping.
+
+Detalhe do PARTITION BY: O uso de `PARTITION BY p` é essencial para que a consulta não confunda posições anteriores de ônibus diferentes. Cada ônibus (bus_id) tem seu próprio túnel de histórico.
+
+--------------------------------------------------------------------------------
+4. CONSULTA ANALÍTICA FINAL: CÁLCULO DE DISTÂNCIA E VELOCIDADE
+--------------------------------------------------------------------------------
+Comando: SELECT ... FROM velocidades_onibus WHERE prev_ta IS NOT NULL;
+Objetivo: Consumir a view enriquecida anterior, cruzar o "Antes" e "Depois" de cada ônibus e deduzir a velocidade de transição. A cláusula `WHERE prev_ta IS NOT NULL` ignora a primeiríssima leitura de todo ônibus, já que ela não tem histórico (ponto anterior) para poder calcular velocidade.
+
+Campos Matemáticos Gerados:
+* distancia_km: Aplica a "Fórmula de Haversine", que traça a diferença (latitude atual menos prévia, longitude atual menos prévia), transformando tudo em radianos. A equação cruza senos e cossenos multiplicando o resultado pelo diâmetro da terra (~6371 * 2) para resultar na distância esférica percorrida (em km).
+* delta_segundos: Subtrai o timestamp anterior (`prev_ta`) do atual (`ta_ts`) retornando a variação exata apenas em segundos.
+* velocidade_kmh: O campo final calculado.
+  1. Ele primeiramente valida via `CASE WHEN` se os segundos (`delta_segundos`) são maiores que 0.
+  2. Se válidos, ele executa a fórmula de Velocidade Média: V = Distância(km) / Tempo(horas).
+  3. Para achar as horas ele pega o `delta_segundos` e divide por `3600.0`.
+  4. Tudo isso fica envolvido pela função `ROUND(..., 2)`, que arrendonda e entrega o valor lindamente com apenas 2 casas decimais de precisão (ex: 45.12 km/h).

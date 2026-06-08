@@ -22,6 +22,7 @@ services:
       flink-net:
         ipv4_address: 172.20.0.10
     environment:
+      TZ: America/Sao_Paulo
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
         rest.address: jobmanager
@@ -41,6 +42,7 @@ services:
       flink-net:
         ipv4_address: 172.20.0.11
     environment:
+      TZ: America/Sao_Paulo
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 2
@@ -63,6 +65,7 @@ services:
       flink-net:
         ipv4_address: 172.20.0.12
     environment:
+      TZ: America/Sao_Paulo
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
         rest.address: jobmanager
@@ -84,7 +87,7 @@ services:
       KAFKA_PROCESS_ROLES: "broker,controller"
       KAFKA_NODE_ID: "1"
       KAFKA_CLUSTER_ID: "kafka-cluster-local"
-
+      TZ: America/Sao_Paulo
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
 
       KAFKA_LISTENERS: "EXTERNAL://0.0.0.0:9092,INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093"
@@ -122,6 +125,7 @@ services:
       KAFKA_CLUSTERS_0_NAME: local-cluster
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       # Schema Registry (AVRO / Protobuf / JSON Schema)
+      TZ: America/Sao_Paulo
       KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
     restart: unless-stopped
 
@@ -139,6 +143,7 @@ services:
     ports:
       - "8085:8081"
     environment:
+      TZ: America/Sao_Paulo
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
