@@ -26,3 +26,7 @@ kafka_data/*
 
 .env.*
 !.env.example
+
+*.pyc
+
+__pycache__

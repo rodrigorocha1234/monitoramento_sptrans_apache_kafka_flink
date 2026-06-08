@@ -28,12 +28,16 @@
       "type": "int"
     },
     {
+      "name": "p",
+      "type": "int"
+    },
+    {
       "name": "a",
       "type": "boolean"
     },
     {
       "name": "ta",
-      "type": "int"
+      "type": "long"
     },
     {
       "name": "ta_tempo",

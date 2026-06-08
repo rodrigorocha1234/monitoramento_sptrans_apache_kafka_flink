@@ -34,4 +34,15 @@ RUN wget -P /opt/flink/lib \
 RUN wget -P /opt/flink/lib \
 https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.7.0/kafka-clients-3.7.0.jar
 
+
+RUN wget -P /opt/flink/lib \
+https://repo1.maven.org/maven2/org/apache/flink/flink-json/2.2.0/flink-json-2.2.0.jar
+
+
+RUN wget -P /opt/flink/lib \
+https://packages.confluent.io/maven/io/confluent/kafka-schema-registry-client/7.6.0/kafka-schema-registry-client-7.6.0.jar
+
+RUN wget -P /opt/flink/lib \
+https://repo1.maven.org/maven2/com/google/guava/guava/32.1.3-jre/guava-32.1.3-jre.jar
+
 USER flink

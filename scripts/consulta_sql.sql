@@ -2,7 +2,7 @@
 DROP TABLE IF EXISTS linhas_onibus;
 
 -- Tabela corrigida incluindo a coluna física da chave Kafka
-CREATE TABLE bus_positions_raw (
+CREATE TABLE linhas_onibus (
 
     c STRING,
     cl INT,
@@ -10,18 +10,19 @@ CREATE TABLE bus_positions_raw (
     lt0 STRING,
     lt1 STRING,
     qv INT,
+    p INT,
     a BOOLEAN,
 
-    ta INT,
+    ta BIGINT,
     ta_tempo STRING,
 
     py DOUBLE,
     px DOUBLE,
 
-    event_time AS TO_TIMESTAMP(ta_tempo),
+    ta_ts AS TO_TIMESTAMP(ta_tempo),
 
-    WATERMARK FOR event_time AS
-        event_time - INTERVAL '10' SECOND
+    WATERMARK FOR ta_ts AS
+        ta_ts - INTERVAL '10' SECOND
 
 )
 WITH (
@@ -44,9 +45,7 @@ WITH (
 
 -- Teste
 SELECT *
-FROM linhas_onibus
-where ;
-
+FROM linhas_onibus;
 
 -- 1) Cria uma visão com a posição anterior de cada ônibus usando LAG()
 CREATE TEMPORARY VIEW velocidades_onibus AS
