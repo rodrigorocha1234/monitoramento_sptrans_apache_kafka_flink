@@ -23,7 +23,7 @@ kafka_data/*
 /scripts/jars/flink-sql-connector-kafka-4.0.1-2.0.jar
 .env
 
-aa
+aaqqq
 .env.*
 !.env.example
 
