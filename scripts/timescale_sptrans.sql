@@ -93,8 +93,9 @@ CREATE TABLE posicao_atual_onibus (
 
 );
 
-select count(*)
-from posicao_atual_onibus;
+select *
+from posicao_atual_onibus
+order by timestamp_evento desc;
 
 
 
