@@ -4,6 +4,19 @@ USER root
 
 RUN mkdir -p /opt/flink/lib
 
+# JDBC Core
+RUN wget -P /opt/flink/lib \
+https://repo1.maven.org/maven2/org/apache/flink/flink-connector-jdbc-core/4.0.0-2.0/flink-connector-jdbc-core-4.0.0-2.0.jar
+
+# JDBC PostgreSQL
+RUN wget -P /opt/flink/lib \
+https://repo1.maven.org/maven2/org/apache/flink/flink-connector-jdbc-postgres/4.0.0-2.0/flink-connector-jdbc-postgres-4.0.0-2.0.jar
+
+# Driver PostgreSQL
+RUN wget -P /opt/flink/lib \
+https://jdbc.postgresql.org/download/postgresql-42.7.7.jar
+
+
 # Kafka
 RUN wget -P /opt/flink/lib \
     https://repo1.maven.org/maven2/org/apache/flink/flink-connector-kafka/4.0.1-2.0/flink-connector-kafka-4.0.1-2.0.jar

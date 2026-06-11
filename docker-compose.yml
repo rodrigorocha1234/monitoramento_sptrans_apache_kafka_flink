@@ -25,7 +25,9 @@ services:
       TZ: America/Sao_Paulo
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
+        parallelism.default: 3
         rest.address: jobmanager
+        jobmanager.memory.process.size: 1024m
 
   taskmanager:
     build:
@@ -45,7 +47,10 @@ services:
       TZ: America/Sao_Paulo
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
-        taskmanager.numberOfTaskSlots: 2
+        rest.address: jobmanager
+        taskmanager.memory.process.size: 4096m
+        taskmanager.numberOfTaskSlots: 4
+        taskmanager.memory.process.size: 4096m
 
   sql-client:
     build:
@@ -148,3 +153,38 @@ services:
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
     restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    profiles:
+      - dashboard
+    volumes:
+      - ./grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - TZ=America/Sao_Paulo
+    networks:
+      flink-net:
+        ipv4_address: 172.20.0.24
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg17
+    container_name: timescaledb
+    hostname: timescaledb
+    profiles:
+      - dashboard
+    ports:
+      - "5432:5432"
+    networks:
+      flink-net:
+        ipv4_address: 172.20.0.25
+    environment:
+      POSTGRES_DB: sptrans
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      TZ: America/Sao_Paulo
+    volumes:
+      - ./timescale_data:/var/lib/postgresql/data

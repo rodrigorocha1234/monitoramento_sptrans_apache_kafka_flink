@@ -18,9 +18,6 @@ class BasePipeline:
         lista_linha = self.__servico_sptrans_api.buscar_linhas()
         return lista_linha if lista_linha else []
 
-
-
-
     def rodar_pipeline(self):
         while True:
             linhas = self.__recuperar_dados_onibus()
@@ -29,7 +26,7 @@ class BasePipeline:
                     self.__servico_streaming.enviar_dados(linha)
             else:
                 print('Sem resultado')
-            sleep(60)
+            sleep(15)
 
 
 if __name__ == "__main__":
