@@ -63,7 +63,15 @@ services:
     depends_on:
       - jobmanager
       - taskmanager
-    command: bin/sql-client.sh
+    command: >
+      /bin/bash -c "
+      echo 'Executando Schema...' && bin/sql-client.sh -f /opt/flink/sql/load_schema.sql
+      "
+    volumes:
+      # Mapeia a sua pasta local com os scripts para dentro do container
+      - ./scripts_flink:/opt/flink/sql
+      # O comando agora aponta para o arquivo que mapeamos acima
+
     stdin_open: true
     tty: true
     networks:
@@ -188,3 +196,4 @@ services:
       TZ: America/Sao_Paulo
     volumes:
       - ./timescale_data:/var/lib/postgresql/data
+

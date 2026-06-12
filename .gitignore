@@ -482,3 +482,14 @@ __pycache__
 /grafana_data/plugins/grafana-pyroscope-app/plugin.json
 /grafana_data/plugins/grafana-pyroscope-app/README.md
 /grafana_data/grafana.db
+/docs/_gtfs/agency.txt
+/docs/_gtfs/calendar.txt
+/docs/_gtfs/fare_attributes.txt
+/docs/_gtfs/fare_rules.txt
+/docs/_gtfs/frequencies.txt
+/docs/_gtfs/routes.txt
+/docs/_gtfs/shapes.txt
+/docs/_gtfs/stop_times.txt
+/docs/_gtfs/stops.txt
+/docs/_gtfs/trips.txt
+/docs/_gtfs.zip

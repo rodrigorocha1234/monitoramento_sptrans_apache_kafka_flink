@@ -98,4 +98,26 @@ from posicao_atual_onibus
 order by timestamp_evento desc;
 
 
+select *
+from routes;
+
+select *
+from trips
+where route_id = '1020-10';
+
+select concat('#', r.route_color) as route_color,
+	e.shape_pt_lat as shape_pt_lat,
+	e.shape_pt_lon 
+from trips t
+inner join routes r on r.route_id = t.route_id 
+inner join shapes e on e.shape_id  = t.shape_id 
+where t.route_id = '1020-10';
+
+select 
+	e.shape_pt_lat as shape_pt_lat,
+	e.shape_pt_lon 
+from trips t
+inner join routes r on r.route_id = t.route_id 
+inner join shapes e on e.shape_id  = t.shape_id 
+where t.route_id = '1020-10';
 
