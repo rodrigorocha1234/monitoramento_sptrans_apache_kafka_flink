@@ -43,7 +43,7 @@ SELECT create_hypertable(
     if_not_exists => TRUE
 );
 
-select * 
+select vmm.bus_id , vmm.window_start , vmm.window_end , vmm.velocidade_media 
 from velocidade_media_3min vmm
 where vmm.velocidade_media  is not null
 order by vmm.window_end desc;
@@ -93,9 +93,17 @@ CREATE TABLE posicao_atual_onibus (
 
 );
 
+truncate table posicao_atual_onibus;
+
 select *
 from posicao_atual_onibus
 order by timestamp_evento desc;
+
+select *
+from posicao_atual_onibus
+where linha = '1017-10'
+order by timestamp_evento desc;
+
 
 
 select *
