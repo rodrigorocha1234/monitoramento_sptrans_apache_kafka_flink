@@ -169,6 +169,7 @@ services:
       - dashboard
     volumes:
       - ./grafana_data:/var/lib/grafana
+      - ./grafana_icons:/usr/share/grafana/public/img/icons/custom
     ports:
       - "3000:3000"
     environment:
