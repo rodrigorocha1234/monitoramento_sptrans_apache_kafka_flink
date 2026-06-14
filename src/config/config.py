@@ -14,3 +14,4 @@ class Config:
     URL_SCHEMA_REGISTRY: Final[str] = os.environ['URL_SCHEMA_REGISTRY']
     PORTA_SCHEMA_REGISTRY: Final[str] = os.environ['PORTA_SCHEMA_REGISTRY']
     CAMINHO_SCHEMA: Final[str] = os.path.join(os.getcwd(),'schema_sptrans', 'schema_sptrans.avsc')
+    TOPICO_DLQ: Final[str] = os.environ.get('TOPICO_DLQ', 'posicoes_sptrans_dlq')

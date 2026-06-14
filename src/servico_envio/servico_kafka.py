@@ -1,4 +1,5 @@
 import logging
+import json
 from typing import Final
 
 from confluent_kafka import Producer
@@ -30,6 +31,7 @@ class ProdutorKafka:
 
         self.__string_serializer = StringSerializer("utf_8")
         self.__TOPICO: Final[str] = "posicoes_sptrans"
+        self.__TOPICO_DLQ: Final[str] = Config.TOPICO_DLQ
 
     @staticmethod
     def __obter_retorno(err, msg):
@@ -48,6 +50,22 @@ class ProdutorKafka:
             msg.offset()
         )
 
+    def __enviar_dlq(self, dados_envio: Linha, erro: Exception):
+        try:
+            logger.warning(f"Enviando mensagem para DLQ devido a erro: {erro}")
+            key = self.__string_serializer(str(dados_envio.get("cl", "unknown")))
+            value = self.__string_serializer(json.dumps(dados_envio))
+            
+            self.__producer.produce(
+                topic=self.__TOPICO_DLQ,
+                key=key,
+                value=value,
+                on_delivery=self.__obter_retorno
+            )
+            self.__producer.poll(0)
+        except Exception as e:
+            logger.error(f"Erro fatal ao enviar para DLQ: {e}")
+
     def enviar_dados(self, dados_envio: Linha):
 
         # KEY (ok como string simples)
@@ -56,20 +74,24 @@ class ProdutorKafka:
         # 🔴 AVRO CORRETO (ESSENCIAL)
         serializer = self.__estrategia_serializacao.serializacao
 
-        value = serializer(
-            dados_envio,
-            SerializationContext(self.__TOPICO, MessageField.VALUE)
-        )
+        try:
+            value = serializer(
+                dados_envio,
+                SerializationContext(self.__TOPICO, MessageField.VALUE)
+            )
 
-        self.__producer.produce(
-            topic=self.__TOPICO,
-            key=key,
-            value=value,
-            on_delivery=self.__obter_retorno
-        )
+            self.__producer.produce(
+                topic=self.__TOPICO,
+                key=key,
+                value=value,
+                on_delivery=self.__obter_retorno
+            )
 
-        # não usar flush por mensagem
-        self.__producer.poll(0)
+            # não usar flush por mensagem
+            self.__producer.poll(0)
+        except Exception as e:
+            logger.error(f"Erro de serialização ou produção. Movendo para DLQ: {e}")
+            self.__enviar_dlq(dados_envio, e)
 
     def fechar(self):
         self.__producer.flush()
