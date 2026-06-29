@@ -1,0 +1,31 @@
+Explicação do arquivo docker-compose.yml (Monitoramento Tempo Real SPTrans Flink)
+===================================================================================
+
+Este arquivo docker-compose.yml define a infraestrutura completa para o processamento de dados em tempo real do sistema da SPTrans utilizando Apache Kafka e Apache Flink, além de ferramentas de armazenamento e visualização.
+
+A rede utilizada é a `flink-net` (subnet 172.20.0.0/16), que atribui IPs estáticos para os containers, garantindo uma comunicação consistente. Todos os containers estão configurados com o fuso horário `America/Sao_Paulo`.
+
+Os serviços estão divididos em três grupos principais através de "profiles", o que permite iniciar partes específicas da infraestrutura isoladamente usando comandos como `docker compose --profile <nome> up -d`:
+
+1. Profile: servico_flink (Processamento de Dados)
+--------------------------------------------------
+Este grupo é o coração do processamento de fluxo (stream processing). Os três serviços utilizam uma imagem customizada construída a partir de `scripts/fflink.Dockerfile`.
+* jobmanager (IP: 172.20.0.10): É o nó mestre (coordenador) do Apache Flink. Ele distribui as tarefas e monitora a execução. Expõe a interface web do Flink na porta local 8081.
+* taskmanager (IP: 172.20.0.11): É o nó trabalhador do Flink, onde os dados (streams) são efetivamente processados.
+* sql-client (IP: 172.20.0.12): É o cliente interativo para submeter comandos SQL ao Flink. Ele está configurado para executar automaticamente o script `load_schema.sql` (mapeado da pasta local `./scripts_flink`) ao iniciar. Isso automatiza a criação de tabelas, conectores e views no Flink.
+
+2. Profile: servico_kafka (Ingestão e Mensageria)
+-------------------------------------------------
+Este grupo lida com a entrada e roteamento de grandes volumes de dados (mensagens em tempo real).
+* kafka (IP: 172.20.0.21): O Apache Kafka atua como o principal broker de mensagens. Ele utiliza o modo KRaft (Kafka Raft, dispensando o Zookeeper), atuando como broker e controller simultaneamente. Os dados são armazenados localmente na pasta `./kafka_data`. Expõe a porta 9092.
+* kafka-ui (IP: 172.20.0.22): Uma interface gráfica amigável na web para monitorar e gerenciar o cluster Kafka, tópicos, consumidores e mensagens. Acessível localmente na porta 8084.
+* schema-registry (IP: 172.20.0.23): O Confluent Schema Registry. Ele armazena e versiona as estruturas de dados (schemas como JSON, Avro, Protobuf) dos tópicos do Kafka, garantindo a integridade dos tipos e formatos dos dados.
+
+3. Profile: dashboard (Armazenamento e Visualização)
+----------------------------------------------------
+Este grupo armazena as métricas e dados já processados para apresentação.
+* timescaledb (IP: 172.20.0.25): Um banco de dados baseado no PostgreSQL, otimizado para dados de séries temporais. É o destino final provável dos dados agregados e processados pelo Flink. O banco criado chama-se `sptrans` com as credenciais admin/admin. Os dados são persistidos em `./timescale_data`. Acessível na porta padrão 5432.
+* grafana (IP: 172.20.0.24): Ferramenta líder para criação de dashboards interativos. Lê os dados armazenados no TimescaleDB para visualização de métricas e estado do sistema em tempo real. Acessível na porta 3000 localmente, mantendo suas configurações salvas em `./grafana_data`.
+
+Resumo do Fluxo de Arquitetura:
+O sistema ingere dados de APIs da SPTrans (e possivelmente outras fontes) em tópicos do Kafka. O cluster Flink (TaskManagers coordenados pelo JobManager) consome essas mensagens do Kafka (usando os schemas validados pelo Schema Registry), realiza as transformações, cálculos ou junções necessárias, e envia os resultados enriquecidos para o banco de dados TimescaleDB. O Grafana consulta o banco TimescaleDB continuamente para exibir os dados e análises em tempo real para o usuário final.

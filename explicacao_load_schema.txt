@@ -1,0 +1,41 @@
+Viewed explicacao_multiplicidades_pipeline.txt:1-37
+Ran command: `find . -name "load_schema.sql"`
+Viewed load_schema.sql:1-269
+
+O arquivo [`load_schema.sql`](file:///home/rodrigo/PycharmProjects/monitoramento_tempo_real_sptrans_flink/scripts_flink/load_schema.sql) é um script de **Flink SQL**. Ele define toda a topologia do pipeline de processamento de stream (em tempo real) utilizando o Apache Flink. 
+
+De forma resumida, ele lê os dados brutos de posição dos ônibus no Kafka, faz processamentos complexos (como cálculo de velocidade em janelas de tempo) e envia os resultados consolidados para um banco de dados (TimescaleDB/PostgreSQL).
+
+Aqui está a explicação de cada parte do arquivo:
+
+### 1. Leitura de Dados da Origem (Source)
+**Tabela `linhas_onibus`** (Linhas 1 a 32)
+Cria uma tabela virtual no Flink que se conecta diretamente ao tópico Kafka (`posicoes_sptrans`). 
+- **Formato:** Ele usa `avro-confluent` integrado com o Schema Registry para decodificar as mensagens automaticamente.
+- **Event Time (Tempo de Evento):** Ele define `ta_ts` (timestamp do evento na SPTrans) como o tempo oficial e aplica um `WATERMARK` de 10 segundos para lidar com o atraso (latência) na chegada dos dados.
+
+### 2. Cálculos e Transformações (Views)
+**View `velocidades_evento`** (Linhas 34 a 91)
+- Utiliza a função `LAG()` para comparar a posição atual de um ônibus com a posição imediatamente anterior (baseado no ID do ônibus e ordenado pelo tempo).
+- Aplica a **Fórmula de Haversine** (cálculos trigonométricos com SENO e COSSENO) para calcular a distância percorrida entre os dois pontos (latitude e longitude) e, dividindo pelo tempo decorrido, calcula a **velocidade instantânea em km/h** do ônibus naquele evento.
+
+**View `velocidade_media_3min`** (Linhas 93 a 112)
+- Cria uma janela de tempo deslizante (`HOP window`) de **3 minutos**, que se atualiza a cada **30 segundos**.
+- Agrupa as velocidades pelo ônibus (`bus_id`) e pela `linha`, tirando a média (`AVG(velocidade_kmh)`) dentro dessa janela de tempo.
+
+### 3. Escrita nos Destinos (Sinks - TimescaleDB)
+O script define três grandes rotas de saída de dados (utilizando o conector JDBC para gravar no PostgreSQL/TimescaleDB):
+
+**A. Sink de Velocidade Média** (Linhas 114 a 146)
+- **`velocidade_media_sink`**: Mapeia a tabela destino no banco.
+- O `INSERT INTO` pega o resultado contínuo da janela de 3 minutos e faz o "streaming" contínuo salvando no banco de dados.
+
+**B. Sink de Catálogo de Linhas** (Linhas 148 a 186)
+- **`linhas_catalogo`**: Extrai uma lista única (`SELECT DISTINCT`) de todas as linhas que aparecem no stream (código da linha, origem e destino).
+- O `INSERT INTO` grava esses dados no banco para servir de catálogo referencial (dimensão).
+
+**C. Sink da Posição Atual (Real-Time State)** (Linhas 188 a 269)
+- **`ultima_data_por_onibus` & `ultima_posicao_onibus`**: Usam `MAX(ta_ts)` com `JOIN` para filtrar constantemente apenas a *última* localização conhecida de cada ônibus e descartar o histórico passado.
+- O `INSERT INTO` na `posicao_atual_sink` funciona como um *Upsert*, mantendo o banco de dados sempre atualizado com a foto exata de onde cada ônibus se encontra naquele segundo.
+
+**Resumo:** O arquivo pega um "canhão" de eventos no Kafka, calcula velocidades matemáticas entre coordenadas geográficas, cria médias móveis temporais de 3 minutos, descobre as últimas posições de cada ônibus e direciona tudo mastigado para as tabelas do banco de dados (que provavelmente alimentam algum dashboard Grafana no seu projeto).

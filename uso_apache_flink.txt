@@ -1,0 +1,40 @@
+# O Uso do Apache Flink no Projeto
+
+O Apache Flink desempenha o papel central de processamento de fluxo de dados (stream processing) em tempo real neste projeto de monitoramento de ônibus da SPTrans. 
+
+Abaixo estão os detalhes da arquitetura e as principais responsabilidades do Flink no sistema:
+
+## 1. Visão Geral da Arquitetura
+O pipeline de dados do projeto segue o modelo:
+- Ingestão: Um script em Python (`src/base_pipeline.py`) consome dados da API da SPTrans, os serializa usando Avro e publica as mensagens no Apache Kafka.
+- Mensageria: O Kafka atua como o broker central de mensagens, recebendo as posições de ônibus em tempo real e mantendo o esquema no Schema Registry.
+- Processamento: O Apache Flink consome os dados do Kafka, realiza transformações e agregações complexas em tempo real, e envia os resultados para o banco de dados.
+- Armazenamento e Visualização: Os dados processados pelo Flink são salvos no TimescaleDB (um banco de dados baseado em PostgreSQL otimizado para séries temporais) e são consumidos pelo Grafana para exibição em dashboards.
+
+## 2. Como o Flink está configurado
+O Flink roda através do Docker Compose (`docker-compose.yml`) com três componentes principais:
+- JobManager: Responsável por coordenar a execução das tarefas.
+- TaskManager: Os "workers" (trabalhadores) que executam o processamento de fato.
+- SQL Client: Um contêiner utilitário usado para submeter os scripts do Flink SQL (como o `load_schema.sql`).
+
+## 3. Principais Responsabilidades do Flink (Flink SQL)
+O processamento do Flink foi implementado através do Flink SQL (visível no arquivo `scripts_flink/load_schema.sql`). Ele faz as seguintes operações:
+
+### A. Consumo do Kafka
+Criação da tabela `linhas_onibus` conectada ao tópico `posicoes_sptrans` do Kafka. Ele usa o conector do Kafka e o formato `avro-confluent` integrado ao Schema Registry para desserializar as informações que chegam. Além disso, configura "Watermarks" (marcas d'água) que lidam com possíveis atrasos e ordenação dos eventos pelo tempo.
+
+### B. Cálculo de Velocidade Instantânea
+Criação da view temporária `velocidades_evento`. O Flink usa funções analíticas (como `LAG()`) para obter a posição anterior de um mesmo ônibus (agrupado pelo ID) e calcula a distância percorrida entre a coordenada anterior e a atual usando a Fórmula de Haversine. Com a distância e a diferença de tempo, ele encontra a velocidade em km/h de cada ônibus.
+
+### C. Agregação em Janelas de Tempo (Time Windows)
+O Flink consolida os dados de forma temporal. Ele cria a view `velocidade_media_3min` usando janelas deslizantes (HOP window) a cada 30 segundos com tamanho de 3 minutos. Ele calcula a velocidade média de cada ônibus naquele intervalo de tempo.
+
+### D. Extração de Entidades e Última Posição Atualizada
+- Linhas: Extrai dinamicamente um catálogo único com as linhas, origens e destinos (`linhas_catalogo`).
+- Posição Atual: Identifica sempre o último dado válido recebido para cada ônibus (`ultima_posicao_onibus`), descartando posições antigas, garantindo que o mapa ou painel exiba sempre a informação mais recente.
+
+### E. Envio para o TimescaleDB (Sink)
+Por fim, o Flink SQL mapeia tabelas de saída usando o conector JDBC para persistir os resultados (velocidade média, posições mais recentes e o catálogo de linhas) diretamente nas tabelas correspondentes do banco de dados relacional (TimescaleDB) para consumo posterior pelo Grafana.
+
+## Resumo
+O Apache Flink é o "motor" inteligente do projeto. Ele não só transporta os dados, mas aplica lógicas matemáticas (cálculo de velocidade por coordenadas), gerencia estado em janelas de tempo, trata dados atrasados, e transforma o grande volume bruto do Kafka em visões consolidadas e limpas, que ficam disponíveis quase que instantaneamente no banco de dados.

@@ -1,0 +1,60 @@
+@startuml c4_docker
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+' LAYOUT
+LAYOUT_WITH_LEGEND()
+
+title Diagrama C4 (Container) - Arquitetura Docker Compose SPTrans
+
+' PERSONAS (Atores)
+Person(dev_data, "Engenheiro de Dados", "Monitora os jobs, brokers e esquemas de dados.")
+Person(user_dash, "Analista de Negócios", "Analisa as métricas de transporte em tempo real.")
+
+System_Boundary(docker_host, "Docker Host (Network: flink-net)") {
+
+    ' Flink
+    System_Boundary(flink, "Processamento Flink") {
+        Container(sql_client, "Flink SQL Client", "Bash / Flink SQL", "Interface de linha de comando para submissão de Jobs DDL/DML.")
+        Container(jobmanager, "JobManager", "Apache Flink", "Nó mestre que coordena o fluxo de execução e gerencia os checkpoints. Expõe UI na porta 8081.")
+        Container(taskmanager, "TaskManager", "Apache Flink", "Nó worker que executa as tarefas (slots) consumindo memória.")
+    }
+
+    ' Kafka
+    System_Boundary(kafka_eco, "Ecosistema Kafka") {
+        Container(kafka_ui, "Kafka UI", "Provectus", "Interface Web para gerenciar tópicos, mensagens e consumers na porta 8084.")
+        Container(schema_registry, "Schema Registry", "Confluent", "Repositório centralizado de esquemas Avro/JSON (Porta 8085).")
+        ContainerQueue(kafka_broker, "Kafka Broker", "Apache Kafka", "Broker de mensageria para ingestão e roteamento de eventos (Porta 9092/29092).")
+    }
+
+    ' Storage & BI
+    System_Boundary(storage, "Armazenamento & Visualização") {
+        Container(grafana, "Grafana", "Grafana Labs", "Painel de visualização de dashboards dinâmicos na porta 3000.")
+        ContainerDb(timescaledb, "TimescaleDB", "PostgreSQL", "Banco de dados time-series para persistência dos resultados analíticos (Porta 5432).")
+    }
+}
+
+' RELACIONAMENTOS - EXTERNOS
+Rel(dev_data, sql_client, "Acessa CLI via Terminal", "Bash")
+Rel(dev_data, jobmanager, "Acessa UI de Monitoramento", "HTTP:8081")
+Rel(dev_data, kafka_ui, "Monitora Tópicos Kafka", "HTTP:8084")
+Rel(user_dash, grafana, "Visualiza Dashboards", "HTTP:3000")
+
+' RELACIONAMENTOS - FLINK
+Rel(sql_client, jobmanager, "Envia execução de queries (Job)", "RPC")
+Rel(taskmanager, jobmanager, "Reporta status (Heartbeat)", "RPC")
+
+' RELACIONAMENTOS - KAFKA
+Rel(kafka_ui, kafka_broker, "Inspeciona métricas e mensagens", "TCP")
+Rel(kafka_ui, schema_registry, "Consulta schemas registrados", "HTTP")
+Rel(schema_registry, kafka_broker, "Usa tópicos internos (_schemas)", "TCP")
+
+' RELACIONAMENTOS - INTEGRAÇÃO (FLINK E DADOS)
+Rel_D(jobmanager, kafka_broker, "Monitora partições de tópicos", "Kafka API")
+Rel_D(taskmanager, kafka_broker, "Lê eventos e grava resultados (Source/Sink)", "Kafka API")
+Rel_D(taskmanager, timescaledb, "Grava agregações finais (JDBC Sink)", "JDBC")
+Rel_D(sql_client, timescaledb, "Envia declarações DDL/DML", "JDBC")
+
+' RELACIONAMENTOS - BI
+Rel(grafana, timescaledb, "Executa queries SQL para Dashboards", "JDBC")
+
+@enduml

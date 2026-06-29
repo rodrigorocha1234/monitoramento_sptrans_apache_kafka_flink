@@ -1,0 +1,116 @@
+@startuml diagrama_classes_pipeline
+
+' Configurações Visuais
+skinparam monochrome false
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 60
+skinparam class {
+    BackgroundColor #FFFFFF
+    BorderColor #1E293B
+    ArrowColor #1E293B
+    FontName "Segoe UI"
+}
+skinparam package {
+    BackgroundColor #F8FAFC
+    BorderColor #CBD5E1
+    FontColor #0F172A
+    FontName "Segoe UI"
+}
+
+title **Diagrama de Classes com Pacotes - BasePipeline**
+
+package "src" {
+    
+    class BasePipeline {
+        - __servico_sptrans_api : ISptransApi
+        - __servico_streaming : IServicoEnvio<Linha>
+        
+        - __recuperar_dados_onibus() : List<Linha>
+        + rodar_pipeline() : void
+    }
+
+    package "modelo" {
+        class Linha <<Model>> {
+            ' Atributos abstraídos
+        }
+    }
+
+    package "servico_sptrans" {
+        interface ISptransApi {
+            + buscar_linhas() : List<Linha>
+        }
+        
+        class ApiSptrans {
+            - __CHAVE : str
+            - __URL : str
+            - __cookie : str
+
+            - __realizar_login() : str
+            - __get_cookie() : str
+            - {static} __desnormalizar_json(ln: dict) : List<Linha>
+            + buscar_linhas() : List<Linha>
+        }
+    }
+
+    package "servico_envio" {
+        interface "IServicoEnvio<Linha>" as IServicoEnvio {
+            + enviar_dados(dado: Linha)
+        }
+        
+        class ProdutorKafka {
+            - __estrategia_serializacao : EstrategiaSerializacao
+            - __producer : Producer
+            - __string_serializer : StringSerializer
+            - __TOPICO : str
+            - __TOPICO_DLQ : str
+
+            - {static} __obter_retorno(err, msg)
+            - __enviar_dlq(dados_envio: Linha, erro: Exception)
+            + enviar_dados(dados_envio: Linha)
+            + fechar()
+        }
+    }
+    
+    package "estrategia_serializacao" {
+        class EstrategiaAvro {
+        }
+    }
+    
+    package "config" {
+        class Config {
+            + URL_API_SPTRANS : str
+            + CHAVE_API_SPTRANS : str
+            + URL_KAFKA : str
+            + PORTA_KAFKA : str
+            + URL_SCHEMA_REGISTRY : str
+            + PORTA_SCHEMA_REGISTRY : str
+            + CAMINHO_SCHEMA : str
+            + TOPICO_DLQ : str
+        }
+    }
+}
+
+' ================================
+' RELACIONAMENTOS (Associação, Composição e Implementação)
+' ================================
+
+' Implementações
+ApiSptrans .up.|> ISptransApi : implementa
+ProdutorKafka .up.|> IServicoEnvio : implementa
+
+' Injeção de Dependência (Agregação)
+BasePipeline "1" o-down-> "1" ISptransApi : injeta
+BasePipeline "1" o-down-> "1" IServicoEnvio : injeta
+
+' Dependências
+BasePipeline "1" .down.> "0..*" Linha : recupera / manipula
+ISptransApi "1" .down.> "0..*" Linha : retorna
+IServicoEnvio "1" .down.> "1" Linha : envia
+ProdutorKafka "1" o-down-> "1" EstrategiaAvro : injeta (estratégia)
+ProdutorKafka .down.> Config : utiliza
+ApiSptrans .down.> Config : utiliza
+EstrategiaAvro .down.> Config : utiliza
+
+@enduml

@@ -1,0 +1,141 @@
+@startuml arquitetura_docker
+
+' =====================================================================
+' CONFIGURAÇÕES VISUAIS (DESIGN MODERN PREMIUM - HIGH READABILITY FOR PDF)
+' =====================================================================
+skinparam monochrome false
+skinparam shadowing false
+skinparam ranksep 80
+skinparam nodesep 40
+skinparam dpi 300
+scale 0.8
+skinparam ArrowThickness 1.2
+skinparam BoxPadding 8
+
+' Estilo Geral do Canvas
+skinparam BackgroundColor #FFFFFF
+skinparam ArrowColor #1E293B
+skinparam TitleFontColor #0F172A
+skinparam TitleFontSize 16
+skinparam TitleFontName "Segoe UI"
+
+' Estilo Padrão para Componentes (Boxes)
+skinparam rectangle {
+    BackgroundColor #FFFFFF
+    BorderColor #1E293B
+    FontColor #0F172A
+    FontName "Segoe UI"
+    FontSize 11
+    RoundCorner 8
+}
+
+' Estilos Temáticos por Estereótipos (Tailwind Color Scale - High Contrast)
+skinparam rectangle<<Web>> {
+    BackgroundColor #E0F2FE
+    BorderColor #0284C7
+    FontColor #0F172A
+}
+
+skinparam rectangle<<Processamento>> {
+    BackgroundColor #FEF3C7
+    BorderColor #D97706
+    FontColor #451A03
+}
+
+skinparam rectangle<<Mensageria>> {
+    BackgroundColor #F3E8FF
+    BorderColor #9333EA
+    FontColor #3B0764
+}
+
+skinparam database {
+    BackgroundColor #DCFCE7
+    BorderColor #16A34A
+    FontColor #14532D
+    FontSize 11
+    FontName "Segoe UI"
+}
+
+skinparam package {
+    BackgroundColor #F8FAFC
+    BorderColor #CBD5E1
+    FontColor #0F172A
+    FontSize 12
+    FontName "Segoe UI"
+}
+
+title **Arquitetura de Infraestrutura e Integração - SPTrans (docker-compose.yml)**
+
+' =====================================================================
+' CAMADA 1: APLICAÇÕES, PORTAIS WEB E CLIENTS (PORTAS EXPOSTAS)
+' =====================================================================
+package "Camada 1: Interfaces, Dashboards & Clients (Portas Expostas)" {
+    rectangle "**grafana**\n(Dashboard)\n[IP: 172.20.0.24 | Porta :3000]" as grafana <<Web>>
+    rectangle "**kafka-ui**\n(Kafka Web UI)\n[IP: 172.20.0.22 | Porta :8084]" as kafkaui <<Web>>
+    rectangle "**sql-client**\n(CLI do Flink)\n[IP: 172.20.0.12]" as sqlclient <<Web>>
+}
+
+' =====================================================================
+' CAMADA 2: PROCESSAMENTO DISTRIBUÍDO
+' =====================================================================
+package "Camada 2: Processamento Distribuído (Apache Flink)" {
+    rectangle "**jobmanager**\n(Coordenação/UI)\n[IP: 172.20.0.10 | Porta :8081]" as jm <<Processamento>>
+    rectangle "**taskmanager**\n(Workers Flink)\n[IP: 172.20.0.11]" as tm <<Processamento>>
+}
+
+' =====================================================================
+' CAMADA 3: INTEGRAÇÃO & PERSISTÊNCIA (DADOS E EVENTOS)
+' =====================================================================
+package "Camada 3: Camada de Dados, Eventos & Integração" {
+    rectangle "**schema-registry**\n(Gerenciamento Avro)\n[IP: 172.20.0.23 | Porta :8085]" as schemareg <<Mensageria>>
+    rectangle "**kafka**\n(Message Broker)\n[IP: 172.20.0.21 | Porta :9092]" as kafka <<Mensageria>>
+    database "**timescaledb**\n(PostgreSQL)\n[IP: 172.20.0.25 | Porta :5432]" as timescaledb
+}
+
+' =====================================================================
+' FLUXO DE CONECTIVIDADE E ARROWS (EVITA CONFLITO VISUAL E CRUZAMENTO DE LINHAS)
+' =====================================================================
+
+' Conexões de Dashboards -> Databases (Camada 1 para Camada 3)
+grafana -[#0284C7]down-> timescaledb : Consulta
+
+' Conexões do Kafka UI (Camada 1 para Camada 3)
+kafkaui -[#9333EA]down-> schemareg : Integra
+kafkaui -[#9333EA]down-> kafka : Monitora
+
+' Conexões do SQL Client (Camada 1 para Camada 2)
+sqlclient -[#D97706]down-> jm : Conecta
+sqlclient -[#D97706]down-> tm : Depende
+
+' Comunicação Interna Flink (Camada 2)
+tm -[#D97706]left-> jm : RPC
+
+' Comunicação Interna Kafka (Camada 3)
+schemareg -[#9333EA]right-> kafka : Usa
+
+' Flink interagindo com Dados (Camada 2 para Camada 3)
+jm .[#D97706]down.> kafka : Consome/Produz
+tm .[#D97706]down.> kafka : Processa Eventos
+tm .[#D97706]down.> timescaledb : Sink de Resultados
+sqlclient .[#0284C7]down.> timescaledb : DDL/DML
+
+' =====================================================================
+' ALINHAMENTOS INVISÍVEIS DE LAYOUT (GARANTE A SIMETRIA E O EMPILHAMENTO DE CAMADAS)
+' =====================================================================
+grafana -[hidden]right-> kafkaui
+kafkaui -[hidden]right-> sqlclient
+
+jm -[hidden]right-> tm
+
+timescaledb -[hidden]right-> kafka
+kafka -[hidden]right-> schemareg
+
+' Empilhamento Vertical Simétrico 
+grafana -[hidden]down-> jm
+kafkaui -[hidden]down-> jm
+sqlclient -[hidden]down-> tm
+
+jm -[hidden]down-> timescaledb
+tm -[hidden]down-> kafka
+
+@enduml

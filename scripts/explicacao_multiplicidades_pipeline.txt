@@ -1,0 +1,36 @@
+Explicação das Multiplicidades - Diagrama de Classes (base_pipeline.py)
+======================================================================
+
+As multiplicidades (ou cardinalidades) em um diagrama de classes indicam a quantidade de instâncias de uma classe que se relacionam com instâncias de outra classe. 
+
+No contexto do script `base_pipeline.py`, as seguintes multiplicidades se aplicam aos relacionamentos estruturais:
+
+1. BasePipeline e ISptransApi (1 -> 1)
+--------------------------------------
+- Relacionamento: Agregação / Injeção de Dependência
+- Multiplicidade: "1" BasePipeline possui exatamente "1" implementação de ISptransApi.
+- Explicação: Quando o objeto `BasePipeline` é instanciado, ele exige obrigatoriamente um único serviço que saiba se comunicar com a SPTrans para buscar os dados.
+
+2. BasePipeline e IServicoEnvio (1 -> 1)
+----------------------------------------
+- Relacionamento: Agregação / Injeção de Dependência
+- Multiplicidade: "1" BasePipeline possui exatamente "1" implementação de IServicoEnvio.
+- Explicação: Da mesma forma, o pipeline requer exatamente um único serviço de streaming (ex: ProdutorKafka) instanciado para o qual enviará os dados extraídos.
+
+3. ISptransApi / BasePipeline e Linha (1 -> 0..*)
+-------------------------------------------------
+- Relacionamento: Dependência / Manipulação
+- Multiplicidade: O método `buscar_linhas()` da API retorna uma lista que contém de "0" a "Muitas" (0..*) instâncias de `Linha`.
+- Explicação: Em uma chamada à API, o sistema pode não retornar nenhum ônibus/linha (0) caso haja uma falha ou indisponibilidade, ou pode retornar dezenas/centenas de instâncias (*). O `BasePipeline` irá iterar (for) sobre essa relação de 0 a N linhas.
+
+4. IServicoEnvio e Linha (1 -> 1, executado N vezes)
+----------------------------------------------------
+- Relacionamento: Dependência (parâmetro de método)
+- Multiplicidade: O método `enviar_dados(linha)` processa exatamente "1" instância de `Linha` por vez.
+- Explicação: Embora o pipeline manipule várias linhas, a interface de envio de streaming é projetada para injetar 1 único objeto de dados por vez no broker (ex: tópico Kafka). 
+
+5. ProdutorKafka e EstrategiaAvro (1 -> 1)
+------------------------------------------
+- Relacionamento: Agregação / Composição
+- Multiplicidade: "1" ProdutorKafka contém "1" EstrategiaAvro.
+- Explicação: Para o produtor Kafka funcionar corretamente de acordo com o `main`, ele é instanciado recebendo exatamente uma única estratégia de serialização, garantindo que todas as mensagens emitidas por ele usem a mesma formatação (Avro).
