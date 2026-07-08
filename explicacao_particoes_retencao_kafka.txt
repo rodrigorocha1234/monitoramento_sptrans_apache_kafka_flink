@@ -1,0 +1,29 @@
+Configurações de Partições Físicas e Tempo de Retenção:
+
+Essas configurações (como número de partições e tempo de retenção) não estão definidas no arquivo `servico_kafka.py`.
+
+O código presente em `servico_kafka.py` apenas instancia um produtor (Producer) e envia as mensagens para o tópico "posicoes_sptrans". 
+
+Quando um produtor tenta publicar em um tópico que ainda não existe, o Kafka tem um comportamento padrão de auto-criar o tópico usando as configurações globais do cluster (broker). No seu ambiente (verificado via docker-compose.yml), não há variáveis de ambiente alterando os padrões de partições ou de retenção de dados, então o Kafka utilizará os padrões (defaults) de fábrica:
+
+- Partições (Partitions): 1 (padrão)
+- Tempo de Retenção (Retention time): 7 dias (168 horas, padrão do Kafka)
+- Fator de Replicação (Replication Factor): 1 (definido explicitamente no docker-compose.yml em KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR)
+
+Formas de customizar essas configurações:
+
+1. Alterando globalmente no docker-compose.yml:
+   Adicionando nas variáveis de ambiente do serviço Kafka:
+   KAFKA_NUM_PARTITIONS: "3"
+   KAFKA_LOG_RETENTION_HOURS: "24" # 1 dia
+
+2. Criando o tópico explicitamente no Python (usando o AdminClient):
+   Adicionando código na inicialização do serviço para verificar e criar os tópicos com as configurações desejadas.
+   Exemplo:
+   from confluent_kafka.admin import AdminClient, NewTopic
+   admin_client = AdminClient({"bootstrap.servers": "..."})
+   novo_topico = NewTopic("posicoes_sptrans", num_partitions=3, replication_factor=1, config={"retention.ms": "86400000"})
+   admin_client.create_topics([novo_topico])
+
+3. Usando um Script Shell de Inicialização:
+   Criar um script para rodar no Docker e criar os tópicos manualmente com o comando kafka-topics.sh passando as flags --partitions e --config retention.ms.

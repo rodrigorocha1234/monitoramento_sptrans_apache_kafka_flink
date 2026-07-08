@@ -1,5 +1,6 @@
 .idea
 .venv
+grafana_data/
 /kafka_data/__cluster_metadata-0/00000000000000000000.index
 /kafka_data/__cluster_metadata-0/00000000000000000000.log
 /kafka_data/__cluster_metadata-0/00000000000000000000.timeindex

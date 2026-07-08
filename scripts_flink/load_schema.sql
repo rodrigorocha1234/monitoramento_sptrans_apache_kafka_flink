@@ -16,9 +16,10 @@ CREATE TABLE linhas_onibus (
     px DOUBLE,
 
     ta_ts AS TO_TIMESTAMP(ta_tempo),
+    kafka_time TIMESTAMP(3) METADATA FROM 'timestamp',
 
-    WATERMARK FOR ta_ts AS
-        ta_ts - INTERVAL '10' SECOND
+    WATERMARK FOR kafka_time AS
+        kafka_time - INTERVAL '2' SECOND
 
 )
 WITH (
@@ -36,6 +37,7 @@ SELECT
     bus_id,
     linha,
     ta_ts,
+    kafka_time,
 
     CASE
         WHEN prev_ta IS NULL THEN NULL
@@ -62,33 +64,59 @@ SELECT
                     ta_ts
                 ) / 3600.0
             )
-    END AS velocidade_kmh
+    END AS velocidade_kmh,
 
-FROM (
-    SELECT
-        p AS bus_id,
-        c AS linha,
-        py AS latitude,
-        px AS longitude,
-        ta_ts,
+    CASE
+        WHEN prev_ta IS NULL THEN NULL
+        WHEN TIMESTAMPDIFF(SECOND, prev_ta, ta_ts) <= 0 THEN NULL
+        ELSE
+            (
+                6371.0 * 2 * ASIN(
+                    SQRT(
+                        POWER(SIN(RADIANS(latitude - prev_latitude) / 2), 2)
+                        +
+                        COS(RADIANS(prev_latitude))
+                        *
+                        COS(RADIANS(latitude))
+                        *
+                        POWER(SIN(RADIANS(longitude - prev_longitude) / 2), 2)
+                    )
+                )
+            )
+    END AS distancia_km,
 
-        LAG(py) OVER (
-            PARTITION BY p
-            ORDER BY ta_ts
-        ) AS prev_latitude,
+    CASE
+        WHEN prev_ta IS NULL THEN NULL
+        WHEN TIMESTAMPDIFF(SECOND, prev_ta, ta_ts) <= 0 THEN NULL
+        ELSE TIMESTAMPDIFF(SECOND, prev_ta, ta_ts) / 3600.0
+    END AS tempo_horas
 
-        LAG(px) OVER (
-            PARTITION BY p
-            ORDER BY ta_ts
-        ) AS prev_longitude,
+    FROM (
+        SELECT
+            p AS bus_id,
+            c AS linha,
+            py AS latitude,
+            px AS longitude,
+            ta_ts,
+            kafka_time,
 
-        LAG(ta_ts) OVER (
-            PARTITION BY p
-            ORDER BY ta_ts
-        ) AS prev_ta
+            LAG(py) OVER (
+                PARTITION BY p
+                ORDER BY kafka_time
+            ) AS prev_latitude,
 
-    FROM linhas_onibus
-);
+            LAG(px) OVER (
+                PARTITION BY p
+                ORDER BY kafka_time
+            ) AS prev_longitude,
+
+            LAG(ta_ts) OVER (
+                PARTITION BY p
+                ORDER BY kafka_time
+            ) AS prev_ta
+
+        FROM linhas_onibus
+    );
 
 CREATE VIEW velocidade_media_3min AS
 SELECT
@@ -96,15 +124,22 @@ SELECT
     linha,
     window_start,
     window_end,
-    ROUND(AVG(velocidade_kmh), 2) AS velocidade_media
+    CAST(
+        CASE 
+            WHEN SUM(tempo_horas) > 0 THEN ROUND(SUM(distancia_km) / SUM(tempo_horas), 2)
+            ELSE 0.0
+        END AS DOUBLE
+    ) AS velocidade_media
 FROM TABLE(
     HOP(
         TABLE velocidades_evento,
-        DESCRIPTOR(ta_ts),
-        INTERVAL '30' SECOND,
+        DESCRIPTOR(kafka_time),
+        INTERVAL '1' MINUTE,
         INTERVAL '3' MINUTES
     )
 )
+WHERE velocidade_kmh IS NOT NULL 
+  AND velocidade_kmh < 120.0
 GROUP BY
     bus_id,
     linha,

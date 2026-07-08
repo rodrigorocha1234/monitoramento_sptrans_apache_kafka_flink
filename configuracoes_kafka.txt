@@ -1,0 +1,12 @@
+Configurações do Kafka utilizadas no arquivo servico_kafka.py:
+
+1. Propriedades do Producer:
+   - bootstrap.servers: Config.URL_KAFKA : Config.PORTA_KAFKA
+
+2. Tópicos:
+   - Tópico principal: "posicoes_sptrans"
+   - Tópico DLQ (Dead Letter Queue): Config.TOPICO_DLQ
+
+3. Serialização:
+   - Chave (Key): StringSerializer("utf_8")
+   - Valor (Value): Definido pela injeção de dependência "estrategia_serializacao.serializacao" (sendo serializado em AVRO conforme comentário no código)

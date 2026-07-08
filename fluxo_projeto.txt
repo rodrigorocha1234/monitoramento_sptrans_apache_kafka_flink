@@ -1,0 +1,31 @@
+======================================================
+     FLUXO DO PROJETO - MONITORAMENTO SPTRANS
+======================================================
+
+O projeto tem como objetivo monitorar em tempo real a posição e a velocidade dos ônibus da SPTrans. O fluxo de dados ponta a ponta é composto pelas seguintes etapas e ferramentas:
+
+1. EXTRAÇÃO DOS DADOS (Python + API SPTrans)
+   - O script `src/base_pipeline.py` faz requisições contínuas (a cada 15 segundos) à API pública da SPTrans.
+   - Ele coleta as posições mais recentes dos veículos em operação e os converte em objetos padronizados, preparando-os para o envio.
+
+2. SERIALIZAÇÃO E INGESTÃO (Kafka + Schema Registry + Avro)
+   - Antes de trafegar, o script Python utiliza a estratégia de serialização Avro para comprimir e estruturar os dados.
+   - Esses dados serializados são publicados continuamente em um tópico do Apache Kafka (ex: `posicoes_sptrans`).
+   - O Confluent Schema Registry garante a governança do esquema Avro, certificando que a estrutura dos dados produzidos e consumidos seja validada.
+   - (A infraestrutura conta com o Kafka-UI rodando no Docker para inspecionar os eventos dos tópicos facilmente).
+
+3. PROCESSAMENTO EM STREAMING (Apache Flink SQL)
+   - O cluster do Apache Flink consome de maneira contínua e em tempo real os dados (eventos) armazenados no tópico do Kafka.
+   - As instruções escritas em Flink SQL (`scripts_flink/load_schema.sql`) executam todo o trabalho de transformação de dados e cálculo:
+     -> Mapeia os dados ingeridos usando o formato `avro-confluent`.
+     -> Utilizando recursos avançados de janelas temporais (Windows e Watermarks), calcula em tempo real a velocidade de deslocamento dos ônibus analisando a diferença entre as últimas coordenadas (fórmula de Haversine).
+     -> Agrupa os eventos e gera métricas como a "Velocidade Média a cada 3 minutos".
+     -> Mantém atualizada a última posição registrada de cada ônibus e o catálogo das linhas circulantes.
+
+4. ARMAZENAMENTO DE SÉRIES TEMPORAIS (TimescaleDB)
+   - Os resultados consolidados pelas queries do Flink (velocidade média de janelas, última posição, catálogo atualizado) são enviados (via sinks JDBC) diretamente para o TimescaleDB.
+   - O TimescaleDB (banco de dados PostgreSQL com extensão focada em dados cronológicos) funciona como o destino otimizado para salvar e ler métricas temporais do sistema com eficiência.
+
+5. VISUALIZAÇÃO DE DADOS (Grafana)
+   - O serviço do Grafana está configurado para se conectar ao TimescaleDB.
+   - Com ele é possível construir dashboards para que os usuários finais visualizem o tráfego da frota da SPTrans em tempo real, monitorando mapas, congestionamentos (por meio da velocidade média calculada) e status dos ônibus instantaneamente.

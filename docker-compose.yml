@@ -28,6 +28,7 @@ services:
         parallelism.default: 3
         rest.address: jobmanager
         jobmanager.memory.process.size: 1024m
+        table.exec.source.idle-timeout: 5s
 
   taskmanager:
     build:
@@ -51,6 +52,7 @@ services:
         taskmanager.memory.process.size: 4096m
         taskmanager.numberOfTaskSlots: 4
         taskmanager.memory.process.size: 4096m
+        table.exec.source.idle-timeout: 5s
 
   sql-client:
     build:
@@ -82,6 +84,7 @@ services:
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
         rest.address: jobmanager
+        table.exec.source.idle-timeout: 5s
 
   kafka:
     image: apache/kafka:4.1.1

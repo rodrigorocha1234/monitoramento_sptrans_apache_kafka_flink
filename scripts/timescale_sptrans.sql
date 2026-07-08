@@ -29,6 +29,10 @@ SET (
     timescaledb.compress_segmentby = 'linha,bus_id'
 );
 
+select *
+from velocidade_media_3min vmm 
+order by vmm.window_end desc;
+
 SELECT add_compression_policy(
     'velocidade_media_3min',
     INTERVAL '7 days'
