@@ -50,8 +50,11 @@ SELECT create_hypertable(
 select vmm.bus_id , vmm.window_start , vmm.window_end , vmm.velocidade_media 
 from velocidade_media_3min vmm
 where vmm.velocidade_media  is not null
-and vmm.linha = '1014-10'
+and vmm.linha = '3754-10'
 order by vmm.window_end desc;
+
+select *
+from velocidade_media_3min;
 
 ---- Lista linhas
 
