@@ -1,0 +1,36 @@
+# Monitoramento em Tempo Real do Transporte Público de São Paulo (SPTrans)
+
+## 📌 Visão Geral do Projeto
+Este projeto consiste no desenvolvimento de um pipeline de Engenharia de Dados ponta a ponta para o monitoramento em tempo real da frota de ônibus da SPTrans. O objetivo é capturar, processar e visualizar os dados de telemetria dos veículos, possibilitando entender o panorama do trânsito e da operação do transporte público na maior cidade da América Latina através da extração de métricas de forma imediata.
+
+---
+
+## 💼 Visão de Negócio: Transformando Dados em Decisões (Para a Equipe de Negócios)
+Para as equipes de gestão, operações e estratégia, este projeto entrega inteligência acionável em tempo real. Não se trata apenas de pontos em um mapa, mas de otimização logística e melhoria na experiência do passageiro.
+
+### O Valor Gerado e Casos de Uso:
+- **Gestão de Frota e Operação:** Acompanhamento instantâneo e visual de onde estão os ônibus de cada linha, permitindo a identificação de furos na escala, comboios de ônibus (bunching) e permitindo remanejamentos rápidos.
+- **Identificação de Gargalos de Trânsito:** O cálculo de velocidade média e velocidade de deslocamento revela áreas de lentidão crônica ou aguda, ajudando a entender o trânsito da cidade e a planejar melhorias (como novas faixas exclusivas).
+- **Previsibilidade para o Passageiro:** Os dados consolidados são a fundação para aplicativos de mobilidade, informando com precisão o tempo estimado de chegada, reduzindo a ansiedade do usuário.
+- **Democratização da Informação:** Painéis no Grafana entregam métricas complexas de forma visual e intuitiva para os tomadores de decisão, sem a necessidade de solicitar relatórios demorados à equipe de TI.
+
+---
+
+## ⚙️ Visão Técnica: Arquitetura e Engenharia de Dados (Para a Equipe Técnica)
+Para engenheiros de dados e arquitetos de software, este projeto demonstra a orquestração e uso de tecnologias no estado da arte para processamento contínuo (streaming) e arquitetura orientada a eventos. A solução foi desenhada com foco em baixa latência, governança, resiliência e escalabilidade.
+
+### Arquitetura e Fluxo de Dados:
+1. **Extração de Dados (Python & REST APIs):** Scripts automatizados realizam requisições periódicas (a cada 15 segundos) à API pública da SPTrans (Olho Vivo), garantindo a ingestão da posição GPS de milhares de veículos ativos.
+2. **Mensageria e Governança (Apache Kafka + Schema Registry + Avro):** Os dados brutos são serializados em formato binário Avro (otimizando armazenamento e rede) e publicados em tópicos no Apache Kafka. O Confluent Schema Registry atua como um contrato de dados, garantindo que mudanças estruturais não quebrem os consumidores downstreams (garantia de qualidade).
+3. **Processamento em Streaming (Apache Flink SQL):** O núcleo do processamento analítico. O Flink consome os eventos do Kafka e, utilizando funções de estado, junções e janelas temporais (Tumbling Windows e Watermarks para lidar com dados atrasados), calcula métricas complexas em tempo real. Um exemplo prático é o cálculo de velocidade usando a fórmula de Haversine sobre as diferenças de coordenadas e agregações em janelas de 3 minutos.
+4. **Armazenamento de Séries Temporais (TimescaleDB):** As métricas enriquecidas pelo Flink são exportadas via conectores JDBC para o TimescaleDB (uma extensão nativa do PostgreSQL especializada em Time-Series), otimizando inserções massivas contínuas e consultas cronológicas.
+5. **Visualização (Grafana):** Dashboards conectam-se diretamente ao TimescaleDB para renderizar os dados geoespaciais no mapa e gráficos de séries temporais com atualização quase em tempo real.
+
+### Desafios Técnicos Superados:
+- **Cálculos Matemáticos em Fluxo Contínuo:** O desafio de calcular a distância e velocidade entre coordenadas sequenciais do mesmo veículo em um fluxo infinito de eventos foi resolvido brilhantemente pela capacidade do Flink de manter estado (Stateful Processing).
+- **Isolamento e Reprodutibilidade (Infra as Code):** Toda a infraestrutura e serviços (Kafka, Flink, Postgres, Schema Registry) foram orquestrados localmente via Docker e Docker Compose, reduzindo a complexidade de deploy e garantindo reprodutibilidade do ambiente de desenvolvimento.
+
+---
+
+## 🚀 Impacto e Conclusão
+O projeto consolida as melhores práticas modernas da Engenharia de Dados para cenários de IoT, Telemetria e Smart Cities. Ele serve como prova do conceito de como a união de ferramentas open-source de processamento de streams pode transformar dados brutos em insights logísticos em tempo real, melhorando a compreensão e o ecossistema da mobilidade urbana.
